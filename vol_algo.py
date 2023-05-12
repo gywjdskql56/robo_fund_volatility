@@ -61,7 +61,7 @@ class VolStrategy:
         self.idx_df = pd.read_sql(self.idx_sql, con=self.conn)
         self.stck_df = pd.read_sql(self.stck_sql, con=self.conn)
         self.idx_df.NAME = self.idx_df.NAME.map(lambda x : x.encode('ISO-8859-1').decode('euc-kr'))
-        self.stck_df.NAME = self.stck_df.NAME.map(lambda x : x.encode('ISO-8859-1').decode('euc-kr'))
+        self.stck_df.NAME = self.stck_df.NAME.map(lambda x : x.encode('utf-8').decode('euc-kr'))
         
         self.idx_df.DATE = pd.to_datetime(self.idx_df.DATE)
         self.idx_df = self.idx_df.set_index('DATE')
