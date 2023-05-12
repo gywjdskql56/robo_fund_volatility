@@ -1,0 +1,14 @@
+SELECT * 
+FROM OPENQUERY(ZEDW_ORA, '
+SELECT RMS_DTM, 
+''A101'' AS CODE,
+''KOSPI 200'' AS NAME,
+'''' AS OPEN_P,
+'''' AS HIGH_P,
+'''' AS LOW_P,
+
+IDX AS CLOSE_P
+FROM V_TDM_IDX_SFS
+where 1=1
+and idx_cd = ''K2G01P''
+') 
