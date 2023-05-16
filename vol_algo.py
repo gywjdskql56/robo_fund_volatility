@@ -11,7 +11,11 @@ warnings.simplefilter("ignore")
 
 
 def get_sql(sql_path, file_nm):
-    with open(os.path.join(sql_path, file_nm), encoding='utf-8') as f:
+    wk_dir = os.path.dirname(os.path.realpath(__file__))
+    sql_path = os.path.join(wk_dir , sql_path)
+    tmp_file = os.path.join(sql_path, file_nm)
+
+    with open(tmp_file, encoding='utf-8') as f:
         sql = f.read()
     return sql
 
@@ -20,7 +24,6 @@ def f(col1, col2, col3 ):
         return col1
     else :
         return col2
-
 
 class VolStrategy:
 
@@ -61,7 +64,7 @@ class VolStrategy:
         self.idx_df = pd.read_sql(self.idx_sql, con=self.conn)
         self.stck_df = pd.read_sql(self.stck_sql, con=self.conn)
         self.idx_df.NAME = self.idx_df.NAME.map(lambda x : x.encode('ISO-8859-1').decode('euc-kr'))
-        self.stck_df.NAME = self.stck_df.NAME.map(lambda x : x.encode('utf-8').decode('ISO-8859-1'))
+        self.stck_df.NAME = self.stck_df.NAME.map(lambda x : x.encode('ISO-8859-1').decode('euc-kr'))
         
         self.idx_df.DATE = pd.to_datetime(self.idx_df.DATE)
         self.idx_df = self.idx_df.set_index('DATE')
@@ -146,9 +149,41 @@ class VolStrategy:
         r_df['ret'] = tot_d_ret
         r_df['cum_ret'] = (1+r_df['ret']).cumprod()
         r_df['BM_RET'] = (i_df['k200_ret'] + 1 ).cumprod()
+        r_df.reset_index(inplace=True)
 
         return r_df
+    
+    
 
+    def insert_mp(self, result_df, mp_type, sql):
+        """
+        TODO : 중복체크 쿼리 분리하면 좋을듯함.
+
+        """
+        r_cnt = 0 
+        check_sql = """select count(*) from QUANTDEV..RATB_MP where 1=1 and DT = '{date}' and MP_TYPE = '{mp_type}' and CODE = '{code}' """
+        cursor = self.conn.cursor()
+        for i, rows in result_df.iterrows():
+            for code_map in self.code_list:
+                dt = rows['DATE'].strftime('%Y%m%d')
+                pre_sql = check_sql.format(date = dt, 
+                                           mp_type = mp_type, 
+                                           code = code_map[1]
+                                           )
+                cursor.execute(pre_sql)
+                cnt = cursor.fetchall()
+                # 중복 키 체크
+                if cnt[0][0] > 0 : 
+                    pass
+                else :
+                    value = (dt, mp_type, code_map[1] ,code_map[2] , rows[code_map[2]] , rows[f"{code_map[2]}_W"])
+                    cursor.execute(sql, value)
+                    r_cnt += 1
+                    # print(value)
+        self.conn.commit()
+        print(f'테이블 : QUANTDEV..RATB_MP  \n포트유형 : 변동성_{mp_type} \n적재 건수 : {r_cnt} 건 \n')
+
+    
 
 if __name__ == '__main__' :
 
@@ -227,7 +262,7 @@ if __name__ == '__main__' :
     ################
     #### report ####
     ################
-    result_df1.tail(50).to_excel(f'./output/VOL_ALGO_{mode}_{pf1.name}_{pf1.testtime}.xlsx')
-    result_df2.tail(50).to_excel(f'./output/VOL_ALGO_{mode}_{pf2.name}_{pf2.testtime}.xlsx')
-    result_df3.tail(50).to_excel(f'./output/VOL_ALGO_{mode}_{pf3.name}_{pf3.testtime}.xlsx')
-    print(1)
+    sql = "INSERT INTO QUANTDEV..RATB_MP (DT, MP_TYPE, CODE, KN, RTN_D, WEI_D ) VALUES (%s, %s, %s, %s, %s, %s)"
+    pf1.insert_mp(result_df1, '공격형', sql)
+    pf2.insert_mp(result_df2, '중립형', sql)
+    pf3.insert_mp(result_df3, '안정형', sql)
